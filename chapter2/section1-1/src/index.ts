@@ -1,5 +1,7 @@
 let gl: WebGLRenderingContext = null;
 let canvas: HTMLCanvasElement = null;
+let lastRenderTime: number = 0;
+let elapsedTime: number = 0;
 
 // 准备WebGL的绘制上下文
 function prepare() {
@@ -42,7 +44,7 @@ function prepareVertexData() {
     // 将上面开辟的空间进入编辑模式
     gl.bindBuffer(gl.ARRAY_BUFFER, vertexData);
     // 向上面开辟的空间写入数据
-    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.STATIC_DRAW);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertices), gl.DYNAMIC_DRAW);
 }
 
 var program: WebGLProgram;
@@ -50,8 +52,12 @@ var vertexShader: WebGLShader;
 var fragmentShader: WebGLShader;
 let vertexShaderCode = 
 "attribute vec4 position;"+
+"uniform float elapsedTime;"+
 "void main() {" +
-    "gl_Position = position;" +
+    "float rad = radians(elapsedTime / 1000.0 * 30.0);" +
+    "float x = position.x * cos(rad) - position.y * sin(rad);" +
+    "float y = position.x * sin(rad) + position.y * cos(rad);" +
+    "gl_Position = vec4(x, y, position.z, position.w);" +
 "}";
 let fragmentShaderCode = 
 "void main() {"+
@@ -85,11 +91,26 @@ function compileShader(shaderSrc: string, shaderType: number): WebGLShader {
     return shader;
 }
 
+function rotatePoint(x: number, y: number, degree: number) {
+    let rad = degree / 180 * Math.PI;
+    let newX = x * Math.cos(rad) - y * Math.sin(rad);
+    let newY = x * Math.sin(rad) + y * Math.cos(rad);
+    return {
+        x: newX,
+        y: newY
+    };
+}
 
 function render() {
     gl.viewport(0,0,canvas.width,canvas.height);
     gl.clearColor(0.2, 1, 1, 1.0);
     gl.clear(gl.COLOR_BUFFER_BIT);
+
+
+    let now = (new Date()).getTime();
+    let delta = now - lastRenderTime;
+    lastRenderTime = now;
+    elapsedTime += delta;
 
     gl.useProgram(program);
     gl.bindBuffer(gl.ARRAY_BUFFER, vertexData);
@@ -97,6 +118,8 @@ function render() {
     gl.enableVertexAttribArray(positionLoc);
     gl.vertexAttribPointer(positionLoc, 3, gl.FLOAT, false, 4 * 3, 0);
 
+    let elapsedTimeLoc = gl.getUniformLocation(program, "elapsedTime");
+    gl.uniform1f(elapsedTimeLoc, elapsedTime);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
 
     requestAnimationFrame(render);
@@ -106,5 +129,6 @@ window.onload = () => {
     // 主流程
     prepare();
     webglPrepare();
+    lastRenderTime = (new Date()).getTime();
     render();
 }
